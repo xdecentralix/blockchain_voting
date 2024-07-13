@@ -69,13 +69,13 @@ contract MerkleVoting {
     }
 
     // End Election
-    function endElection() public onlyOwner {
+    function endElection() public {
         require(block.timestamp >= electionEnd, "Election is still ongoing");
         require(electionActive, "Election has not started");
-
-
         electionActive = false;
-               
+        electionStart = 0;
+        electionDuration = 0;
+        electionEnd = 0;
     }
 
     // Helper Functions & Modifiers
@@ -84,7 +84,7 @@ contract MerkleVoting {
     }
 
     function getElectionResults() public view returns (uint256[] memory votesPerCandidate) {
-        require (!electionActive, "Election is still ongoing");
+        require (!electionActive, "Election is ongoing");
         votesPerCandidate = new uint256[](candidates.length);
         for (uint256 i = 0; i < candidates.length; i++) {
             votesPerCandidate[i] = candidates[i].voteCount;
