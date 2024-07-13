@@ -69,25 +69,27 @@ contract MerkleVoting {
     }
 
     // End Election
-    function endElection() public onlyOwner returns (uint256 winnerIndex) {
+    function endElection() public onlyOwner {
         require(block.timestamp >= electionEnd, "Election is still ongoing");
         require(electionActive, "Election has not started");
-        uint maxVotes = 0;
-        winnerIndex = 0;
 
-        for (uint256 i = 0; i < candidates.length; i++) {
-            if (candidates[i].voteCount > maxVotes) {
-                maxVotes = candidates[i].voteCount;
-                winnerIndex = i;
-            }
-        }
+
         electionActive = false;
-        return winnerIndex;
+               
     }
 
     // Helper Functions & Modifiers
     function getNumCandidates() public view returns (uint256) {
         return candidates.length;
+    }
+
+    function getElectionResults() public view returns (uint256[] memory votesPerCandidate) {
+        require (!electionActive, "Election is still ongoing");
+        votesPerCandidate = new uint256[](candidates.length);
+        for (uint256 i = 0; i < candidates.length; i++) {
+            votesPerCandidate[i] = candidates[i].voteCount;
+        }
+        return votesPerCandidate;
     }
 
     function getCandidate(uint256 index) public view returns (string memory, uint256) {
