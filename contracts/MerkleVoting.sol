@@ -6,7 +6,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 contract MerkleVoting {
     struct Voter {
         bool voted;
-        uint256 vote;
+        bytes encryptedVote;
     }
 
     struct Candidate {
@@ -24,6 +24,8 @@ contract MerkleVoting {
     uint256 public electionDuration;
     uint256 public electionEnd;
     bytes32 public merkleRoot;
+
+    event VoteSubmitted(address voter, bytes encryptedVote);
 
     constructor(string memory _electionName) {
         owner = msg.sender;
@@ -54,18 +56,17 @@ contract MerkleVoting {
     }
 
     // Voting
-    function vote(bytes32[] memory _merkleProof, uint256 _candidateIndex) public {
-        require(electionEnd > block.timestamp, "Election is over");
-        require(_candidateIndex < candidates.length, "Invalid candidate index");
+    function vote(bytes32[] memory _merkleProof, bytes memory _encryptedVote) public {
+        require(electionActive, "Election is not active");
+        require(electionEnd <= block.timestamp, "Election is over");
         require(!voters[msg.sender].voted, "You have already voted");
         bytes32 merkleLeaf = keccak256(abi.encodePacked(msg.sender));
         require(MerkleProof.verify(_merkleProof, merkleRoot, merkleLeaf), "You are not eligible to vote");
         
         voters[msg.sender].voted = true;
-        voters[msg.sender].vote = _candidateIndex;
+        voters[msg.sender].encryptedVote = _encryptedVote;
 
-        candidates[_candidateIndex].voteCount += 1;
-        totalVotes += 1;
+        emit VoteSubmitted(msg.sender, _encryptedVote);
     }
 
     // End Election
@@ -83,19 +84,10 @@ contract MerkleVoting {
         return candidates.length;
     }
 
-    function getElectionResults() public view returns (uint256[] memory votesPerCandidate) {
-        require (!electionActive, "Election is ongoing");
-        votesPerCandidate = new uint256[](candidates.length);
-        for (uint256 i = 0; i < candidates.length; i++) {
-            votesPerCandidate[i] = candidates[i].voteCount;
-        }
-        return votesPerCandidate;
-    }
-
-    function getCandidate(uint256 index) public view returns (string memory, uint256) {
+    function getCandidate(uint256 index) public view returns (string memory) {
         require(index < candidates.length, "Invalid candidate index");
         Candidate memory candidate = candidates[index];
-        return (candidate.name, candidate.voteCount);
+        return (candidate.name);
     }
 
     function getCandidates() public view returns (Candidate[] memory) {
