@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract BlockchainVoting {
+contract MerkleVoting {
     struct Voter {
         bool voted;
         uint256 vote;
