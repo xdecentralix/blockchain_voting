@@ -1,44 +1,66 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.19;
+
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract BlockchainVoting {
     struct Voter {
         bool voted;
-        uint vote;
+        uint256 vote;
     }
 
     struct Candidate {
         string name;
-        uint voteCount;
+        uint256 voteCount;
     }
 
     address public owner;
     string public electionName;
     mapping(address => Voter) public voters;
     Candidate[] public candidates;
-    uint public totalVotes;
+    uint256 public totalVotes;
+    bool public electionActive = false;
+    uint256 public electionStart;
+    uint256 public electionDuration;
+    uint256 public electionEnd;
+    bytes32 public merkleRoot;
 
-    address[] public eligibleVoters;
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Caller is not owner");
-        _;
-    }
-
-    constructor(string memory _name, address[] memory _eligibleVoters) {
+    constructor(string memory _electionName) {
         owner = msg.sender;
-        electionName = _name;
-        eligibleVoters = _eligibleVoters;
+        electionName = _electionName;
     }
 
-    function addCandidate(string memory _name) public onlyOwner {
-        candidates.push(Candidate(_name, 0));
+    // Setup of the election
+    function setMerkleRoot(bytes32 _merkleRoot) public onlyOwner {
+        merkleRoot = _merkleRoot;
     }
 
-    function vote(uint _candidateIndex) public {
+    function addCandidates(string[] memory _names) public onlyOwner {
+        require (!electionActive, "Election has already started");
+        for (uint256 i = 0; i < _names.length; i++) {
+            candidates.push(Candidate(_names[i], 0));
+        }
+    }
+
+    // Start the election
+    function startElection(uint256 _electionDuration) public onlyOwner {
+        require(!electionActive);
+        require(merkleRoot != 0, "Merkle root is not set");
+        require(candidates.length > 0, "No candidates added");
+        electionActive = true;
+        electionStart = block.timestamp;
+        electionDuration = _electionDuration;
+        electionEnd = electionStart + _electionDuration;
+    }
+
+    // Voting
+    function vote(bytes32[] memory _merkleProof, uint256 _candidateIndex) public {
+        require(electionEnd > block.timestamp, "Election is over");
+        require(_candidateIndex < candidates.length, "Invalid candidate index");
         require(!voters[msg.sender].voted, "You have already voted");
-        require(isEligible(msg.sender), "You are not eligible to vote");
-
+        bytes32 merkleLeaf = keccak256(abi.encodePacked(msg.sender));
+        require(MerkleProof.verify(_merkleProof, merkleRoot, merkleLeaf), "You are not eligible to vote");
+        
         voters[msg.sender].voted = true;
         voters[msg.sender].vote = _candidateIndex;
 
@@ -46,38 +68,40 @@ contract BlockchainVoting {
         totalVotes += 1;
     }
 
-    function isEligible(address voter) public view returns (bool) {
-        for (uint i = 0; i < eligibleVoters.length; i++) {
-            if (eligibleVoters[i] == voter) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function endElection() public onlyOwner view returns (uint winnerIndex) {
+    // End Election
+    function endElection() public onlyOwner returns (uint256 winnerIndex) {
+        require(block.timestamp >= electionEnd, "Election is still ongoing");
+        require(electionActive, "Election has not started");
         uint maxVotes = 0;
         winnerIndex = 0;
 
-        for (uint i = 0; i < candidates.length; i++) {
+        for (uint256 i = 0; i < candidates.length; i++) {
             if (candidates[i].voteCount > maxVotes) {
                 maxVotes = candidates[i].voteCount;
                 winnerIndex = i;
             }
         }
+        electionActive = false;
+        return winnerIndex;
     }
 
-    function getNumCandidates() public view returns (uint) {
+    // Helper Functions & Modifiers
+    function getNumCandidates() public view returns (uint256) {
         return candidates.length;
     }
 
-    function getCandidate(uint index) public view returns (string memory, uint) {
+    function getCandidate(uint256 index) public view returns (string memory, uint256) {
         require(index < candidates.length, "Invalid candidate index");
         Candidate memory candidate = candidates[index];
         return (candidate.name, candidate.voteCount);
     }
 
-    function getEligibleVoters() public view returns (address[] memory) {
-        return eligibleVoters;
+    function getCandidates() public view returns (Candidate[] memory) {
+        return candidates;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Caller is not owner");
+        _;
     }
 }
