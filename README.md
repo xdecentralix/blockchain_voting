@@ -1,5 +1,6 @@
-VoteCrypt 
-A Transparent Voting System 
+***VoteCrypt***
+
+*A Transparent Voting System*
 
 
 The MerkleVoting smart contract was written using Solidity code and deployed on the Hedera blockchain. The contract utilizes two main structs, a Voter struct and a Candidate struct. The smart contract has an owner that can add candidates and administer the election phases. 
